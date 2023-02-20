@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <atomic>
 
 #include <obs-module.h>
 #include <graphics/graphics.h>
@@ -30,7 +31,6 @@
 #define debug(format, ...) obs_log(LOG_DEBUG, format, ##__VA_ARGS__)
 
 bool obs_module_load(void);
-void obs_module_post_load();
 void obs_module_unload();
 
 spoutSenderNames spout;
@@ -50,11 +50,14 @@ static void *filter_create(obs_data_t *settings, obs_source_t *source);
 static void filter_destroy(void *data);
 static void filter_update(void *data, obs_data_t *settings);
 static void filter_video_render(void *data, gs_effect_t *effect);
+
 static uint32_t filter_get_width(void *data);
 static uint32_t filter_get_height(void *data);
 
 struct filter {
 	obs_source_t *context;
+
+	const char *setting_sender_name; // realtime setting
 
 	std::string sender_name; // spout sendername
 
@@ -62,6 +65,8 @@ struct filter {
 
 	uint32_t width;
 	uint32_t height;
+
+	std::atomic<bool> can_render;
 };
 
 struct obs_source_info create_source_info()
