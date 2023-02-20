@@ -101,7 +101,9 @@ static void filter_video_render(void *data, gs_effect_t *effect)
 	auto res = spout.CheckSender(filter->sender_name.c_str(), width, height,
 				     handle, format);
 
-	// returns true if everything is valid (the same as before)
+	// True if everything is as was (same as last render)
+	// canRender is only used for texture deletion and creation, not actual rendering
+	// TODO canRender should be renamed to validTexture or some shit
 	bool canRender = (res && filter->texture && filter->width == width &&
 			  filter->height == height);
 
@@ -129,13 +131,10 @@ static void filter_video_render(void *data, gs_effect_t *effect)
 			gs_texture_open_shared((uint32_t)(uintptr_t)handle);
 
 		if (tex) {
-
 			filter->texture = tex;
-
-			tex = nullptr;
-
 			filter->width = width;
 			filter->height = height;
+			tex = nullptr;
 		}
 	}
 
@@ -144,8 +143,6 @@ static void filter_video_render(void *data, gs_effect_t *effect)
 		info("could not open spout2 sender shared resource");
 		return;
 	}
-
-	// NOTE :: canRender is meaningless now
 
 	effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 
@@ -221,24 +218,24 @@ static void filter_destroy(void *data)
 {
 	auto filter = (struct filter *)data;
 
-	if (filter) {
+	// This would suck
+	if (!filter)
+		return;
 
-		obs_enter_graphics();
+	obs_enter_graphics();
 
-		// Destroy texture if still exits
-		if (filter->texture) {
-			gs_texture_destroy(filter->texture);
-			filter->texture = nullptr;
-		}
-
-		// Release spout sender regardless
-		// TODO Debug spoutReleaseSender always
-		spout.ReleaseSenderName(filter->sender_name.c_str());
-
-		obs_leave_graphics();
-
-		bfree(filter);
+	// Destroy texture if still exits
+	if (filter->texture) {
+		gs_texture_destroy(filter->texture);
+		filter->texture = nullptr;
 	}
+
+	// Release spout sender regardless
+	spout.ReleaseSenderName(filter->sender_name.c_str());
+
+	obs_leave_graphics();
+
+	bfree(filter);
 }
 
 // Writes a simple log entry to OBS
