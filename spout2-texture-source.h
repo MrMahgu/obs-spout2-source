@@ -36,6 +36,17 @@ void obs_module_unload();
 spoutSenderNames spout;
 
 namespace Spout2SourceTexture {
+// Texture stuff
+namespace SharedTexture {
+inline static bool open(void *data,
+					      bool currentTextureIsValid,
+					      uint32_t handle, uint32_t width,
+					      uint32_t height);
+inline static void destroy(void *data);
+inline static void render(void *data, gs_effect_t *effect);
+
+} // namespace Texture
+
 // DEBUG stuff
 
 void report_version();

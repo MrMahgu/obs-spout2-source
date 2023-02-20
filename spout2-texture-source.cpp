@@ -4,6 +4,69 @@ OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(OBS_PLUGIN, OBS_PLUGIN_LANG)
 
 namespace Spout2SourceTexture {
+namespace SharedTexture {
+// Attempts to open the spout shared texture handle
+// Return TRUE on success
+inline static bool open(void *data, bool currentTextureIsValid, uint32_t handle,
+			uint32_t width, uint32_t height)
+{
+	auto filter = (struct filter *)data;
+
+	if (!currentTextureIsValid && !filter->texture) {
+
+		gs_texture_t *tex = gs_texture_open_shared(handle);
+
+		if (tex) {
+			filter->texture = tex;
+			filter->width = width;
+			filter->height = height;
+			tex = nullptr;
+		}
+	}
+
+	// Failed
+	if (!filter->texture) {
+		// TODO Convert error message to OBS_TEXT
+		info("could not open spout2 sender shared resource");
+		return false;
+	}
+	return true;
+}
+inline static void destroy(void *data)
+{
+	auto filter = (struct filter *)data;
+
+	gs_texture_destroy(filter->texture);
+
+	filter->texture = nullptr;
+}
+// Renders known spout texture into obs source texture
+inline static void render(void *data, gs_effect_t *effect)
+{
+	auto filter = (struct filter *)data;
+
+	effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+
+	const bool previous = gs_framebuffer_srgb_enabled();
+
+	gs_enable_framebuffer_srgb(true);
+
+	gs_blend_state_push();
+	gs_blend_function(GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
+
+	gs_eparam_t *const image = gs_effect_get_param_by_name(effect, "image");
+
+	gs_effect_set_texture(image, filter->texture);
+
+	// GS_FLIP_V
+	while (gs_effect_loop(effect, "DrawSrgbDecompress"))
+		gs_draw_sprite(filter->texture, 0, 0, 0);
+
+	gs_blend_state_pop();
+
+	gs_enable_framebuffer_srgb(previous);
+}
+} // namespace Texture
 
 static const char *filter_get_name(void *unused)
 {
@@ -63,15 +126,10 @@ static void filter_update(void *data, obs_data_t *settings)
 
 		filter->can_render.store(false);
 
-		info("UPDATE :: Changed sender name");
-		blog(LOG_INFO, filter->setting_sender_name);
-		blog(LOG_INFO, filter->sender_name.c_str());
-
 		// a quick way to do this is to nuke the texture first
 		if (filter->texture) {
 			obs_enter_graphics();
-			gs_texture_destroy(filter->texture);
-			filter->texture = nullptr;
+			SharedTexture::destroy(filter);
 			obs_leave_graphics();
 		}
 
@@ -84,8 +142,6 @@ static void filter_update(void *data, obs_data_t *settings)
 
 static void filter_video_render(void *data, gs_effect_t *effect)
 {
-	UNUSED_PARAMETER(effect);
-
 	auto filter = (struct filter *)data;
 
 	if (!filter->context)
@@ -101,69 +157,28 @@ static void filter_video_render(void *data, gs_effect_t *effect)
 	auto res = spout.CheckSender(filter->sender_name.c_str(), width, height,
 				     handle, format);
 
-	// True if everything is as was (same as last render)
-	// canRender is only used for texture deletion and creation, not actual rendering
-	// TODO canRender should be renamed to validTexture or some shit
-	bool canRender = (res && filter->texture && filter->width == width &&
-			  filter->height == height);
+	bool currentTextureIsValid =
+		(res && filter->texture && filter->width == width &&
+		 filter->height == height);
 
-	// Check width and height and peace out if its useless
+	// If the known width/height is 0, check and destroy out texture
 	if (width == 0 || height == 0) {
 		if (filter->texture) {
-			gs_texture_destroy(filter->texture);
-			filter->texture = nullptr;
+			SharedTexture::destroy(filter);
 		}
 		return;
 	}
 
-	// If we can't render, and our texture is still active, destroy it
-	if (!canRender && filter->texture) {
-		info("delted texture inside render");
-		gs_texture_destroy(filter->texture);
-		filter->texture = nullptr;
+	// If the current texture is invalid, destory our texture
+	if (!currentTextureIsValid && filter->texture) {
+		SharedTexture::destroy(filter);
 	}
 
-	// If we can't render but we're here, we need to open the shared handle again
-	// We also need to update the width & height
-	if (!canRender && !filter->texture) {
-
-		gs_texture_t *tex =
-			gs_texture_open_shared((uint32_t)(uintptr_t)handle);
-
-		if (tex) {
-			filter->texture = tex;
-			filter->width = width;
-			filter->height = height;
-			tex = nullptr;
-		}
-	}
-
-	// Failed to open the shared texture
-	if (!filter->texture) {
-		info("could not open spout2 sender shared resource");
+	if (!SharedTexture::open(filter, currentTextureIsValid,
+				 (uint32_t)(uintptr_t)handle, width, height))
 		return;
-	}
 
-	effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
-
-	const bool previous = gs_framebuffer_srgb_enabled();
-
-	gs_enable_framebuffer_srgb(true);
-
-	gs_blend_state_push();
-	gs_blend_function(GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
-
-	gs_eparam_t *const image = gs_effect_get_param_by_name(effect, "image");
-
-	gs_effect_set_texture(image, filter->texture);
-
-	// GS_FLIP_V
-	while (gs_effect_loop(effect, "DrawSrgbDecompress"))
-		gs_draw_sprite(filter->texture, 0, 0, 0);
-
-	gs_blend_state_pop();
-
-	gs_enable_framebuffer_srgb(previous);
+	SharedTexture::render(filter, effect);
 }
 
 static uint32_t filter_get_width(void *data)
@@ -226,8 +241,7 @@ static void filter_destroy(void *data)
 
 	// Destroy texture if still exits
 	if (filter->texture) {
-		gs_texture_destroy(filter->texture);
-		filter->texture = nullptr;
+		SharedTexture::destroy(filter);
 	}
 
 	obs_leave_graphics();
