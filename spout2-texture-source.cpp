@@ -11,6 +11,17 @@ static const char *filter_get_name(void *unused)
 	return obs_module_text(OBS_SETTING_UI_FILTER_NAME);
 }
 
+static bool filter_update_spout_sender_name(obs_properties_t *,
+					    obs_property_t *, void *data)
+{
+	auto filter = (struct filter *)data;
+
+	obs_data_t *settings = obs_source_get_settings(filter->context);
+	filter_update(filter, settings);
+	obs_data_release(settings);
+	return true;
+}
+
 static obs_properties_t *filter_get_properties(void *unused)
 {
 	UNUSED_PARAMETER(unused);
@@ -18,6 +29,14 @@ static obs_properties_t *filter_get_properties(void *unused)
 	auto props = obs_properties_create();
 
 	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
+
+	obs_properties_add_text(props, OBS_SETTING_UI_SENDER_NAME,
+				obs_module_text(OBS_SETTING_UI_SENDER_NAME),
+				OBS_TEXT_DEFAULT);
+
+	obs_properties_add_button(props, OBS_SETTINGS_UI_BUTTON_TITLE,
+				  obs_module_text(OBS_SETTINGS_UI_BUTTON_TITLE),
+				  filter_update_spout_sender_name);
 
 	return props;
 }
@@ -37,6 +56,30 @@ static void filter_update(void *data, obs_data_t *settings)
 
 	if (!filter->context)
 		return;
+
+	// Update our settings name, if we've changed it
+	if (strcmp(filter->setting_sender_name, filter->sender_name.c_str()) !=
+	    0) {
+
+		filter->can_render.store(false);
+
+		info("UPDATE :: Changed sender name");
+		blog(LOG_INFO, filter->setting_sender_name);
+		blog(LOG_INFO, filter->sender_name.c_str());
+
+		// a quick way to do this is to nuke the texture first
+		if (filter->texture) {
+			obs_enter_graphics();
+			gs_texture_destroy(filter->texture);
+			filter->texture = nullptr;
+			obs_leave_graphics();
+		}
+
+		// Now update the name
+		filter->sender_name = std::string(filter->setting_sender_name);
+
+		filter->can_render.store(true);
+	}
 }
 
 static void filter_video_render(void *data, gs_effect_t *effect)
@@ -48,12 +91,12 @@ static void filter_video_render(void *data, gs_effect_t *effect)
 	if (!filter->context)
 		return;
 
-	// process here?
+	if (!filter->can_render.load())
+		return;
+
 	HANDLE handle;
 	DWORD format;
 	uint32_t width, height;
-
-	//blog(LOG_INFO, filter->sender_name.c_str());
 
 	auto res = spout.CheckSender(filter->sender_name.c_str(), width, height,
 				     handle, format);
@@ -73,6 +116,7 @@ static void filter_video_render(void *data, gs_effect_t *effect)
 
 	// If we can't render, and our texture is still active, destroy it
 	if (!canRender && filter->texture) {
+		info("delted texture inside render");
 		gs_texture_destroy(filter->texture);
 		filter->texture = nullptr;
 	}
@@ -150,13 +194,22 @@ static void *filter_create(obs_data_t *settings, obs_source_t *source)
 	auto filter =
 		(struct filter *)bzalloc(sizeof(Spout2SourceTexture::filter));
 
-	// Fake some shit
+	// Default our size
 	filter->width = 0;
 	filter->height = 0;
-	filter->sender_name = std::string("test");
+
+	// We can always render, until we can't, lol, scarra
+	filter->can_render = true;
 
 	// Setup the obs context
 	filter->context = source;
+
+	// setup the ui setting
+	filter->setting_sender_name =
+		obs_data_get_string(settings, OBS_SETTING_UI_SENDER_NAME);
+
+	// Copy it to our sendername
+	filter->sender_name = std::string(filter->setting_sender_name);
 
 	// force an update
 	filter_update(filter, settings);
