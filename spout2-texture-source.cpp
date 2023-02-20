@@ -243,10 +243,10 @@ static inline void report_version()
 {
 
 #ifdef DEBUG
-	info("you can haz spout2-texture tooz (Version: %s)",
+	info("you can haz spout2-source tooz (Version: %s)",
 	     OBS_PLUGIN_VERSION_STRING);
 #else
-	info("obs-spout2-filter [mrmahgu] - version %s",
+	info("obs-spout2-source [mrmahgu] - version %s",
 	     OBS_PLUGIN_VERSION_STRING);
 #endif
 }
