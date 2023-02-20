@@ -230,10 +230,10 @@ static void filter_destroy(void *data)
 		filter->texture = nullptr;
 	}
 
+	obs_leave_graphics();
+
 	// Release spout sender regardless
 	spout.ReleaseSenderName(filter->sender_name.c_str());
-
-	obs_leave_graphics();
 
 	bfree(filter);
 }
