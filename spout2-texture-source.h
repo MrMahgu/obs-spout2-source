@@ -7,20 +7,23 @@
 
 #include "inc/SpoutSenderNames.h"
 
-#define OBS_PLUGIN "spout2-texture-source"
-#define OBS_PLUGIN_ "spout2_texture_source"
-#define OBS_PLUGIN_VERSION_MAJOR 0
-#define OBS_PLUGIN_VERSION_MINOR 0
-#define OBS_PLUGIN_VERSION_RELEASE 1
-#define OBS_PLUGIN_VERSION_STRING "0.0.1"
-#define OBS_PLUGIN_LANG "en-US"
-#define OBS_PLUGIN_COLOR_SPACE GS_RGBA_UNORM
+/* clang-format off */
 
-#define OBS_SETTING_UI_FILTER_NAME "mahgu.spout2texturesrc.ui.filter_title"
-#define OBS_SETTING_UI_SENDER_NAME "mahgu.spout2texturesrc.ui.sender_name"
-#define OBS_SETTINGS_UI_BUTTON_TITLE "mahgu.spout2texturesrc.ui.button_title"
-#define OBS_SETTING_DEFAULT_SENDER_NAME \
-	"mahgu.spout2texturesrc.default.sender_name"
+#define OBS_PLUGIN                        "spout2-texture-source"
+#define OBS_PLUGIN_                       "spout2_texture_source"
+#define OBS_PLUGIN_VERSION_MAJOR          0
+#define OBS_PLUGIN_VERSION_MINOR          0
+#define OBS_PLUGIN_VERSION_RELEASE        1
+#define OBS_PLUGIN_VERSION_STRING         "0.0.1"
+#define OBS_PLUGIN_LANG                   "en-US"
+#define OBS_PLUGIN_COLOR_SPACE            GS_RGBA_UNORM
+
+#define OBS_SETTING_UI_FILTER_NAME        "mahgu.spout2texturesrc.ui.filter_title"
+#define OBS_SETTING_UI_SENDER_NAME        "mahgu.spout2texturesrc.ui.sender_name"
+#define OBS_SETTINGS_UI_BUTTON_TITLE      "mahgu.spout2texturesrc.ui.button_title"
+#define OBS_SETTING_DEFAULT_SENDER_NAME   "mahgu.spout2texturesrc.default.sender_name"
+
+/* clang-format on */
 
 #define obs_log(level, format, ...) \
 	blog(level, "[spout2-texture-source] " format, ##__VA_ARGS__)
@@ -38,10 +41,8 @@ spoutSenderNames spout;
 namespace Spout2SourceTexture {
 // Texture stuff
 namespace SharedTexture {
-inline static bool open(void *data,
-					      bool currentTextureIsValid,
-					      uint32_t handle, uint32_t width,
-					      uint32_t height);
+inline static bool open(void *data, bool currentTextureIsValid, uint32_t handle,
+			uint32_t width, uint32_t height);
 inline static void destroy(void *data);
 inline static void render(void *data, gs_effect_t *effect);
 
